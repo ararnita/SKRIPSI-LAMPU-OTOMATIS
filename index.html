@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Lighting IoT Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#0b0f19',
+                        cardDark: '#1e293b'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons (versi dikunci agar tidak berubah sewaktu-waktu) -->
+    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+    <!-- SheetJS (XLSX) untuk Export Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .nav-btn.nav-active { background-color: #2563eb !important; color: #ffffff !important; }
+        .dashboard-bg { background-color: #f4f6f9; }
+        .dark .dashboard-bg { background-color: #0b0f19; }
+        .custom-card {
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+        }
+        .dark .custom-card {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body class="dashboard-bg text-slate-800 dark:text-slate-100 min-h-screen flex flex-col font-sans transition-colors duration-300">
+
+<!-- Header / Navbar -->
+<header class="custom-card sticky top-0 z-50 border-b">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap justify-between items-center gap-3">
+        <div class="flex items-center gap-3">
+            <div class="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-600 dark:text-blue-400">
+                <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h1 class="text-base font-bold text-slate-900 dark:text-white">Smart Lighting IoT</h1>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 font-medium tracking-wide">MONITORING & CONTROL SYSTEM</p>
+            </div>
+        </div>
+
+        <nav id="navbar" class="order-3 md:order-2 w-full md:w-auto flex items-center gap-1 overflow-x-auto no-scrollbar">
+            <button data-tab="live" onclick="switchTab('live')" class="nav-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">
+                <i data-lucide="activity" class="w-4 h-4"></i> Live Monitoring
+            </button>
+            <button data-tab="control" onclick="switchTab('control')" class="nav-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">
+                <i data-lucide="sliders" class="w-4 h-4"></i> Kontrol & Mode
+            </button>
+            <button data-tab="history" onclick="switchTab('history')" class="nav-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">
+                <i data-lucide="calendar" class="w-4 h-4"></i> Riwayat Harian
+            </button>
+            <button data-tab="settings" onclick="switchTab('settings')" class="nav-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">
+                <i data-lucide="settings" class="w-4 h-4"></i> Pengaturan
+            </button>
+        </nav>
+
+        <button onclick="toggleTheme()" class="order-2 md:order-3 p-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all" title="Ubah Tema">
+            <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+            <i data-lucide="moon" class="w-5 h-5 block dark:hidden"></i>
+        </button>
+    </div>
+</header>
+
+<main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+
+    <!-- ================= MENU 1: LIVE MONITORING ================= -->
+    <section id="content-live" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+            <div class="custom-card p-6 rounded-2xl transition-all duration-300">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status Lampu</span>
+                    <div class="p-2 rounded-xl bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-slate-700">
+                        <i data-lucide="lightbulb" class="w-5 h-5"></i>
+                    </div>
+                </div>
+                <div id="lampu-badge" class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                    <span id="lampu-dot" class="w-2 h-2 rounded-full bg-rose-500"></span>
+                    <span id="text-lampu">MEMUAT...</span>
+                </div>
+                <p id="label-mode-status" class="text-xs text-slate-500 dark:text-slate-400 mt-4 font-medium">Mode: Memuat...</p>
+            </div>
+
+            <div class="custom-card p-6 rounded-2xl transition-all duration-300">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Intensitas Cahaya (LDR AO)</span>
+                    <div class="p-2 rounded-xl bg-amber-50 dark:bg-slate-800 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-slate-700">
+                        <i data-lucide="sun" class="w-5 h-5"></i>
+                    </div>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span id="val-ldr" class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">-</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">ADC (0-4095)</span>
+                </div>
+                <div class="mt-4">
+                    <div class="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700">
+                        <div id="ldr-bar" class="bg-blue-600 dark:bg-blue-500 h-full w-0 transition-all duration-500 rounded-full"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="custom-card p-6 rounded-2xl transition-all duration-300">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Deteksi Gerakan (PIR)</span>
+                    <div class="p-2 rounded-xl bg-emerald-50 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-slate-700">
+                        <i data-lucide="user" class="w-5 h-5"></i>
+                    </div>
+                </div>
+                <div id="pir-badge" class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                    <span id="dot-pir" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                    <span id="text-pir">MEMUAT...</span>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-4 font-medium">Status Keberadaan Orang</p>
+            </div>
+        </div>
+
+        <div class="custom-card p-5 sm:p-8 rounded-2xl transition-all duration-300">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900 dark:text-white">Akumulasi Energi & Biaya</h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Gabungan Lampu 1 dan Lampu 2, dihitung otomatis dari riwayat Firebase</p>
+                </div>
+                <div class="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                    <i data-lucide="trending-up" class="w-5 h-5"></i>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 pt-2">
+                <div class="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-5 rounded-xl">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Jam Menyala</span>
+                    </div>
+                    <div class="flex items-baseline gap-2 mt-2">
+                        <span id="total-jam" class="text-2xl sm:text-3xl font-extrabold text-blue-600 dark:text-blue-400">0.00</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Jam</span>
+                    </div>
+                    <p id="sub-jam" class="text-[11px] text-slate-500 dark:text-slate-400 mt-2 font-medium">Lampu 1: 0.00 &bull; Lampu 2: 0.00</p>
+                </div>
+
+                <div class="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-5 rounded-xl">
+                    <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Konsumsi Energi</span>
+                    <div class="flex items-baseline gap-2 mt-2">
+                        <span id="total-kwh" class="text-2xl sm:text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">0.0000</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">kWh</span>
+                    </div>
+                    <p id="sub-kwh" class="text-[11px] text-slate-500 dark:text-slate-400 mt-2 font-medium">Lampu 1: 0.0000 &bull; Lampu 2: 0.0000</p>
+                </div>
+
+                <div class="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-5 rounded-xl">
+                    <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Estimasi Biaya Listrik</span>
+                    <div class="flex items-baseline gap-2 mt-2">
+                        <span id="total-biaya" class="text-2xl sm:text-3xl font-extrabold text-indigo-600 dark:text-indigo-400">Rp 0</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Total</span>
+                    </div>
+                    <p id="sub-biaya" class="text-[11px] text-slate-500 dark:text-slate-400 mt-2 font-medium">Lampu 1: Rp 0 &bull; Lampu 2: Rp 0</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= MENU 2: KONTROL MODE & MANUAL ================= -->
+    <section id="content-control" class="hidden space-y-6">
+        <div class="custom-card p-6 md:p-8 rounded-2xl max-w-2xl mx-auto space-y-6">
+            <div>
+                <h2 class="text-base font-bold text-slate-900 dark:text-white">Panel Kontrol Operasional</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Pilih mode otomatis sensor atau kendalikan lampu secara manual</p>
+            </div>
+
+            <div class="space-y-4">
+                <div class="p-5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl flex flex-wrap justify-between items-center gap-3">
+                    <div>
+                        <span class="text-sm font-bold text-slate-900 dark:text-white block">Mode Sistem</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400">Pilih antara kendali sensor atau saklar web</span>
+                    </div>
+                    <div class="flex bg-slate-200 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 p-1 rounded-lg">
+                        <button onclick="setMode('otomatis')" id="btn-mode-auto" class="px-4 py-2 rounded-md text-xs font-semibold transition-all bg-blue-600 text-white shadow-sm">Otomatis</button>
+                        <button onclick="setMode('manual')" id="btn-mode-manual" class="px-4 py-2 rounded-md text-xs font-semibold transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white">Manual</button>
+                    </div>
+                </div>
+
+                <div id="manual-control-card" class="hidden space-y-4">
+                    <!-- RELAY 1 / LAMPU 1 -->
+                    <div class="p-5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl flex flex-wrap justify-between items-center gap-3">
+                        <div>
+                            <span class="text-sm font-bold text-slate-900 dark:text-white block">Relay 1 (Lampu 1)</span>
+                            <span class="text-xs text-slate-500 dark:text-slate-400">Nyalakan atau matikan Lampu 1 secara langsung</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="toggle-manual-relay1" onchange="toggleRelay(1, this)" class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+
+                    <!-- RELAY 2 / LAMPU 2 -->
+                    <div class="p-5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl flex flex-wrap justify-between items-center gap-3">
+                        <div>
+                            <span class="text-sm font-bold text-slate-900 dark:text-white block">Relay 2 (Lampu 2)</span>
+                            <span class="text-xs text-slate-500 dark:text-slate-400">Nyalakan atau matikan Lampu 2 secara langsung</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="toggle-manual-relay2" onchange="toggleRelay(2, this)" class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= MENU 3: RIWAYAT HARIAN ================= -->
+    <section id="content-history" class="hidden space-y-6">
+        <div class="custom-card p-6 md:p-8 rounded-2xl space-y-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900 dark:text-white">Log Rekapitulasi Harian</h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Rekapitulasi durasi dan konsumsi energi harian</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <button onclick="downloadExcel()" class="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition-all shadow-sm">
+                        <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> Download Excel
+                    </button>
+                    <button onclick="loadDailyHistory()" class="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 transition-all">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                <table class="w-full min-w-[760px] text-left border-collapse whitespace-nowrap">
+                    <thead>
+                        <tr class="border-b border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold uppercase tracking-wider">
+                            <th class="py-3.5 px-5">Tanggal</th>
+                            <th class="py-3.5 px-5">Waktu Aktivitas Terakhir</th>
+                            <th class="py-3.5 px-5">Durasi Lampu 1</th>
+                            <th class="py-3.5 px-5">Durasi Lampu 2</th>
+                            <th class="py-3.5 px-5">Konsumsi (kWh)</th>
+                            <th class="py-3.5 px-5">Estimasi Biaya</th>
+                        </tr>
+                    </thead>
+                    <tbody id="daily-table-body" class="divide-y divide-slate-200 dark:divide-slate-800 text-sm text-slate-700 dark:text-slate-300 font-medium">
+                        <tr><td colspan="6" class="text-center py-12 text-slate-400">Memuat data riwayat...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= MENU 4: PENGATURAN ================= -->
+    <section id="content-settings" class="hidden space-y-6">
+        <div class="custom-card p-6 md:p-8 rounded-2xl max-w-xl mx-auto space-y-5">
+            <div>
+                <h2 class="text-base font-bold text-slate-900 dark:text-white">Konfigurasi Sistem</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Sesuaikan parameter kalkulator energi dan bahasa</p>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Daya Lampu 1 (Watt)</label>
+                    <input type="number" id="input-watt" value="10" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Daya Lampu 2 (Watt)</label>
+                    <input type="number" id="input-watt2" value="10" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Tarif Listrik per kWh (Rp)</label>
+                    <input type="number" id="input-tarif" value="1444" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500">
+                </div>
+
+                <button onclick="saveSettings()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all shadow-sm">
+                    Simpan Pengaturan
+                </button>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<footer class="px-4 border-t border-slate-200 dark:border-slate-800 py-6 text-center text-xs text-slate-500 dark:text-slate-400 font-medium">
+    <p>&copy; 2026 Smart Lighting IoT &bull; Powered by Firebase Cloud</p>
+</footer>
+
+<!-- Firebase SDK v8 -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+    lucide.createIcons();
+
+    const firebaseConfig = {
+        databaseURL: "https://skripsi-a25f5-default-rtdb.asia-southeast1.firebasedatabase.app/"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let dayaLampuWatt = parseFloat(localStorage.getItem('lampu_watt')) || 10;
+    let dayaLampu2Watt = parseFloat(localStorage.getItem('lampu2_watt')) || 10;
+    let tarifPerKwh = parseFloat(localStorage.getItem('lampu_tarif')) || 1444;
+
+    document.getElementById('input-watt').value = dayaLampuWatt;
+    document.getElementById('input-watt2').value = dayaLampu2Watt;
+    document.getElementById('input-tarif').value = tarifPerKwh;
+
+    function toggleTheme() {
+        const html = document.documentElement;
+        if (html.classList.contains('dark')) {
+            html.classList.remove('dark');
+            localStorage.setItem('theme', 'light');
+        } else {
+            html.classList.add('dark');
+            localStorage.setItem('theme', 'dark');
+        }
+    }
+
+    if (localStorage.getItem('theme') === 'light') {
+        document.documentElement.classList.remove('dark');
+    } else {
+        document.documentElement.classList.add('dark');
+    }
+
+    function switchTab(tabName) {
+        ['live', 'control', 'history', 'settings'].forEach(t => {
+            document.getElementById(`content-${t}`).classList.add('hidden');
+        });
+        document.getElementById(`content-${tabName}`).classList.remove('hidden');
+        if (tabName === 'history') loadDailyHistory();
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.classList.toggle('nav-active', btn.dataset.tab === tabName);
+        });
+    }
+
+    function saveSettings() {
+        dayaLampuWatt = parseFloat(document.getElementById('input-watt').value) || 10;
+        dayaLampu2Watt = parseFloat(document.getElementById('input-watt2').value) || 10;
+        tarifPerKwh = parseFloat(document.getElementById('input-tarif').value) || 1444;
+        localStorage.setItem('lampu_watt', dayaLampuWatt);
+        localStorage.setItem('lampu2_watt', dayaLampu2Watt);
+        localStorage.setItem('lampu_tarif', tarifPerKwh);
+        renderAkumulasi();
+        alert('Pengaturan berhasil disimpan!');
+        switchTab('live');
+    }
+
+    function setMode(mode) {
+        db.ref('/lampu/mode').set(mode);
+    }
+
+    function toggleRelay(relayNumber, checkbox) {
+        if (relayNumber === 1) {
+            db.ref('/lampu/perintah_manual').set(checkbox.checked);
+        } else if (relayNumber === 2) {
+            db.ref('/lampu/relay2_manual').set(checkbox.checked);
+        }
+    }
+
+    db.ref('/lampu/mode').on('value', (snapshot) => {
+        const mode = snapshot.val() || 'otomatis';
+        const btnAuto = document.getElementById('btn-mode-auto');
+        const btnManual = document.getElementById('btn-mode-manual');
+        const manualCard = document.getElementById('manual-control-card');
+        const labelModeStatus = document.getElementById('label-mode-status');
+
+        if (mode === 'manual') {
+            btnManual.className = "px-4 py-2 rounded-md text-xs font-semibold transition-all bg-blue-600 text-white shadow-sm";
+            btnAuto.className = "px-4 py-2 rounded-md text-xs font-semibold transition-all text-slate-600 dark:text-slate-300";
+            manualCard.classList.remove('hidden');
+            labelModeStatus.innerText = "Mode: Manual (Kontrol Web)";
+        } else {
+            btnAuto.className = "px-4 py-2 rounded-md text-xs font-semibold transition-all bg-blue-600 text-white shadow-sm";
+            btnManual.className = "px-4 py-2 rounded-md text-xs font-semibold transition-all text-slate-600 dark:text-slate-300";
+            manualCard.classList.add('hidden');
+            labelModeStatus.innerText = "Mode: Otomatis (LDR + PIR)";
+        }
+    });
+
+    db.ref('/lampu/perintah_manual').on('value', (snapshot) => {
+        const cb = document.getElementById('toggle-manual-relay1');
+        if (cb) cb.checked = snapshot.val() || false;
+    });
+
+    db.ref('/lampu/relay2_manual').on('value', (snapshot) => {
+        const cb = document.getElementById('toggle-manual-relay2');
+        if (cb) cb.checked = snapshot.val() || false;
+    });
+
+    // Status Lampu 1 (hanya MENAMPILKAN status; riwayat ditulis oleh ESP32)
+    db.ref('/lampu/status').on('value', (snapshot) => {
+        const status = snapshot.val();
+        const badge = document.getElementById('lampu-badge');
+        const dot = document.getElementById('lampu-dot');
+        const text = document.getElementById('text-lampu');
+
+        if (status) {
+            badge.className = "inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20";
+            dot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+            text.innerText = "MENYALA (ON)";
+        } else {
+            badge.className = "inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20";
+            dot.className = "w-2 h-2 rounded-full bg-rose-500";
+            text.innerText = "MATI (OFF)";
+        }
+    });
+
+    db.ref('/sensor/ldr').on('value', (snapshot) => {
+        const val = snapshot.val() ?? 0;
+        document.getElementById('val-ldr').innerText = val;
+        let percent = (val / 4095) * 100;
+        document.getElementById('ldr-bar').style.width = `${percent}%`;
+    });
+
+    db.ref('/sensor/pir').on('value', (snapshot) => {
+        const val = snapshot.val();
+        const badge = document.getElementById('pir-badge');
+        const dot = document.getElementById('dot-pir');
+        const text = document.getElementById('text-pir');
+
+        if (val == 1) {
+            badge.className = "inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20";
+            dot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+            text.innerText = "ADA GERAKAN";
+        } else {
+            badge.className = "inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700";
+            dot.className = "w-2 h-2 rounded-full bg-slate-400";
+            text.innerText = "RUANGAN KOSONG";
+        }
+    });
+
+    // Akumulasi total jam, kWh, dan biaya dari riwayat Lampu 1 & Lampu 2
+    let dataLampu1 = null;
+    let dataLampu2 = null;
+
+    function hitungTotalDetik(data) {
+        if (!data) return 0;
+        let total = 0;
+        let nyala = null;
+
+        Object.values(data).sort((a, b) => a.timestamp - b.timestamp).forEach(item => {
+            if (item.status === true) {
+                nyala = item.timestamp;
+            } else if (item.status === false && nyala !== null) {
+                const durasi = item.timestamp - nyala;
+                if (durasi > 0) total += durasi;
+                nyala = null;
+            }
+        });
+
+        // Jika lampu sedang menyala, tambahkan durasi yang sedang berjalan
+        if (nyala !== null) {
+            const berjalan = Math.floor(Date.now() / 1000) - nyala;
+            if (berjalan > 0) total += berjalan;
+        }
+        return total;
+    }
+
+    function rupiah(angka) {
+        return "Rp " + Math.round(angka).toLocaleString('id-ID');
+    }
+
+    function renderAkumulasi() {
+        const jam1 = hitungTotalDetik(dataLampu1) / 3600;
+        const jam2 = hitungTotalDetik(dataLampu2) / 3600;
+        const kwh1 = (dayaLampuWatt * jam1) / 1000;
+        const kwh2 = (dayaLampu2Watt * jam2) / 1000;
+        const biaya1 = kwh1 * tarifPerKwh;
+        const biaya2 = kwh2 * tarifPerKwh;
+
+        document.getElementById('total-jam').innerText = (jam1 + jam2).toFixed(2);
+        document.getElementById('total-kwh').innerText = (kwh1 + kwh2).toFixed(4);
+        document.getElementById('total-biaya').innerText = rupiah(biaya1 + biaya2);
+
+        document.getElementById('sub-jam').innerText =
+            `Lampu 1: ${jam1.toFixed(2)} • Lampu 2: ${jam2.toFixed(2)}`;
+        document.getElementById('sub-kwh').innerText =
+            `Lampu 1: ${kwh1.toFixed(4)} • Lampu 2: ${kwh2.toFixed(4)}`;
+        document.getElementById('sub-biaya').innerText =
+            `Lampu 1: ${rupiah(biaya1)} • Lampu 2: ${rupiah(biaya2)}`;
+    }
+
+    db.ref('/riwayat_lampu').on('value', (snapshot) => {
+        dataLampu1 = snapshot.val();
+        renderAkumulasi();
+    });
+
+    db.ref('/riwayat_lampu2').on('value', (snapshot) => {
+        dataLampu2 = snapshot.val();
+        renderAkumulasi();
+    });
+
+    let dailyReportData = [];
+
+    function formatDetikKeJamMenitDetik(totalDetik) {
+        const jam = Math.floor(totalDetik / 3600);
+        const menit = Math.floor((totalDetik % 3600) / 60);
+        const detik = totalDetik % 60;
+        return `${jam}j ${menit}m ${detik}d`;
+    }
+
+    // Kunci tanggal format YYYY-MM-DD (aman untuk diurutkan)
+    function keyTanggal(timestamp) {
+        const d = new Date(timestamp * 1000);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const t = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${t}`;
+    }
+
+    // Hitung durasi nyala per hari (dikelompokkan berdasarkan hari saat lampu mati)
+    function olahHarian(data) {
+        const map = {};
+        const lastTs = {};
+        if (!data) return { map, lastTs };
+
+        let nyala = null;
+        Object.values(data).sort((a, b) => a.timestamp - b.timestamp).forEach(item => {
+            const key = keyTanggal(item.timestamp);
+            if (!map[key]) map[key] = 0;
+            lastTs[key] = item.timestamp;
+
+            if (item.status === true) {
+                nyala = item.timestamp;
+            } else if (item.status === false && nyala !== null) {
+                const durasi = item.timestamp - nyala;
+                if (durasi > 0) map[key] += durasi;
+                nyala = null;
+            }
+        });
+        return { map, lastTs };
+    }
+
+    function loadDailyHistory() {
+        Promise.all([
+            db.ref('/riwayat_lampu').once('value'),
+            db.ref('/riwayat_lampu2').once('value')
+        ]).then(([snap1, snap2]) => {
+            const tbody = document.getElementById('daily-table-body');
+            tbody.innerHTML = '';
+            dailyReportData = [];
+
+            const l1 = olahHarian(snap1.val());
+            const l2 = olahHarian(snap2.val());
+            const semuaKey = Array.from(new Set([...Object.keys(l1.map), ...Object.keys(l2.map)]))
+                .sort().reverse();
+
+            if (semuaKey.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-12 text-slate-400">Belum ada data riwayat tercatat.</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            semuaKey.forEach(key => {
+                const detik1 = l1.map[key] || 0;
+                const detik2 = l2.map[key] || 0;
+                const kwh = (dayaLampuWatt * (detik1 / 3600) + dayaLampu2Watt * (detik2 / 3600)) / 1000;
+                const biaya = kwh * tarifPerKwh;
+                const durasi1 = formatDetikKeJamMenitDetik(detik1);
+                const durasi2 = formatDetikKeJamMenitDetik(detik2);
+
+                const tsTerakhir = Math.max(l1.lastTs[key] || 0, l2.lastTs[key] || 0);
+                const tglObj = new Date(tsTerakhir * 1000);
+                const dateLabel = tglObj.toLocaleDateString('id-ID', {
+                    day: '2-digit', month: 'short', year: 'numeric'
+                });
+                const lastTimeStr = tglObj.toLocaleTimeString('id-ID', {
+                    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+                });
+
+                dailyReportData.push({
+                    date: dateLabel,
+                    lastTime: lastTimeStr,
+                    durasi1: durasi1,
+                    detik1: detik1,
+                    durasi2: durasi2,
+                    detik2: detik2,
+                    kwh: kwh,
+                    cost: biaya
+                });
+
+                html += `
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <td class="py-4 px-5 font-semibold text-slate-900 dark:text-white">${dateLabel}</td>
+                        <td class="py-4 px-5 text-slate-600 dark:text-slate-400">${lastTimeStr}</td>
+                        <td class="py-4 px-5 text-blue-600 dark:text-blue-400 font-bold">${durasi1}</td>
+                        <td class="py-4 px-5 text-sky-600 dark:text-sky-400 font-bold">${durasi2}</td>
+                        <td class="py-4 px-5 text-emerald-600 dark:text-emerald-400 font-bold">${kwh.toFixed(4)} kWh</td>
+                        <td class="py-4 px-5 text-indigo-600 dark:text-indigo-400 font-bold">${rupiah(biaya)}</td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        });
+    }
+
+    function downloadExcel() {
+        if (!dailyReportData || dailyReportData.length === 0) {
+            alert("Tidak ada data untuk diunduh!");
+            return;
+        }
+
+        const excelData = dailyReportData.map(item => ({
+            'Tanggal': item.date,
+            'Waktu Terakhir': item.lastTime,
+            'Durasi Lampu 1': item.durasi1,
+            'Detik Lampu 1': item.detik1,
+            'Durasi Lampu 2': item.durasi2,
+            'Detik Lampu 2': item.detik2,
+            'Konsumsi Energi (kWh)': parseFloat(item.kwh.toFixed(4)),
+            'Estimasi Biaya (Rp)': Math.round(item.cost)
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(excelData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Rekap Harian Detil");
+        XLSX.writeFile(workbook, "Laporan_Smart_Lighting_Detail.xlsx");
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        switchTab('live');
+    });
+</script>
+</body>
+</html>
